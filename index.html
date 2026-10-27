@@ -41,28 +41,33 @@
   }
 
   /* ---------- Header ---------- */
-  header { display: flex; align-items: center; justify-content: space-between; gap: 3vw; }
+  /* Header uses the same 3 equal columns as the calendar, so the title sits over the middle tile. */
+  header { display: grid; grid-template-columns: 1fr 1fr 1fr; column-gap: 1.4vw; align-items: center; }
+  .when { justify-self: start; }
+  .now { justify-self: end; }
   .when { display: flex; flex-direction: column; gap: .4vh; }
   .clock { display: flex; align-items: baseline; gap: .8vw; line-height: .9; }
   #time { font-size: 6.4vw; font-weight: 700; letter-spacing: -0.03em; }
   #ampm { font-size: 1.9vw; font-weight: 600; color: var(--muted); }
   #date { font-size: 1.9vw; font-weight: 500; color: var(--muted); }
-  .family { flex: 1; text-align: center; font-size: 3.4vw; font-weight: 800; letter-spacing: -0.01em;
-            color: var(--accent); white-space: nowrap; }
-  .when, .now { flex: 0 0 auto; }
+  .family { justify-self: center; text-align: center; color: var(--accent); line-height: .95; }
+  .family span { display: block; }
+  .family .f1 { font-size: 4.2vw; font-weight: 800; letter-spacing: -0.02em; }
+  .family .f2 { font-size: 2vw; font-weight: 700; letter-spacing: .32em; text-transform: uppercase;
+                color: var(--text); margin-top: .6vh; padding-left: .32em; }
 
-  .now { display: flex; align-items: center; gap: 1.6vw; }
-  .now .ico { width: 7.4vw; height: 7.4vw; }
+  .now { display: flex; align-items: center; gap: 1.2vw; }
+  .now .ico { width: 6.4vw; height: 6.4vw; }
   .now-temp { font-size: 5.4vw; font-weight: 700; letter-spacing: -0.03em; line-height: .9; }
   .now-meta { display: flex; flex-direction: column; gap: .7vh; }
   .now-feels { font-size: 1.75vw; font-weight: 600; }
   .now-feels b { color: var(--accent); font-weight: 700; }
-  .now-sub { font-size: 1.25vw; color: var(--muted); }
+  .now-sub { font-size: 1.25vw; color: var(--muted); white-space: nowrap; }
 
   /* ---------- Calendar ---------- */
   main {
     display: grid;
-    grid-template-columns: 1fr 1fr 1.05fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 1.4vw;
     min-height: 0;
   }
@@ -138,7 +143,7 @@
       <div class="clock"><div id="time">--:--</div><div id="ampm"></div></div>
       <div id="date"></div>
     </div>
-    <div class="family" id="family">Zedans Schedule</div>
+    <div class="family" id="family"><span class="f1">Zedans</span><span class="f2">Schedule</span></div>
     <div class="now" id="now"></div>
   </header>
 
@@ -291,8 +296,8 @@
       '<div class="now-temp">' + r(c.temp) + '</div>' +
       '<div class="now-meta">' +
         '<div class="now-feels">Feels like <b>' + r(c.feels) + '</b></div>' +
-        '<div class="now-sub">' + (LABEL[c.code] || '') + ' · Wind ' + Math.round(c.wind) + ' km/h</div>' +
-        '<div class="now-sub">' + PLACE + '</div>' +
+        '<div class="now-sub">' + (LABEL[c.code] || '') + '</div>' +
+        '<div class="now-sub">Wind ' + Math.round(c.wind) + ' km/h · ' + PLACE + '</div>' +
       '</div>';
 
     fc.innerHTML = '';
