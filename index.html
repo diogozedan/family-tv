@@ -47,6 +47,8 @@
   #time { font-size: 6.4vw; font-weight: 700; letter-spacing: -0.03em; }
   #ampm { font-size: 1.9vw; font-weight: 600; color: var(--muted); }
   #date { font-size: 1.9vw; font-weight: 500; color: var(--muted); }
+  .family { font-size: 1.45vw; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
+            color: var(--accent); margin-bottom: .6vh; }
 
   .now { display: flex; align-items: center; gap: 1.6vw; }
   .now .ico { width: 7.4vw; height: 7.4vw; }
@@ -132,6 +134,7 @@
 <div class="wrap">
   <header>
     <div class="when">
+      <div class="family" id="family">Zedans Family</div>
       <div class="clock"><div id="time">--:--</div><div id="ampm"></div></div>
       <div id="date"></div>
     </div>
