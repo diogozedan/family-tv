@@ -93,9 +93,8 @@
   .ev-loc { grid-column: 2; font-size: 1.05vw; color: var(--faint); margin-top: .2vh;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ev.allday .ev-time { color: var(--accent); }
-  .ev.past { opacity: .38; }
   .ev.live .ev-time { color: var(--accent); }
-  .ev.live .ev-title::after {
+  .ev.live:not(.still) .ev-title::after {
     content: 'NOW'; margin-left: .6vw; font-size: .85vw; font-weight: 800; letter-spacing: .1em;
     color: #1a1206; background: var(--accent); padding: .25vh .45vw; border-radius: .35vw; vertical-align: middle;
   }
@@ -318,13 +317,40 @@
   }
 
   /* ---------- render: calendar ---------- */
-  function eventRow(ev) {
-    var row = el('div', 'ev' + (ev.allDay ? ' allday' : ''));
-    row.appendChild(el('div', 'ev-time', ev.allDay ? 'All day' : ev.time));
+  function eventRow(ev, still) {
+    var row = el('div', 'ev' + (ev.allDay ? ' allday' : '') + (still ? ' still' : ''));
+    var time = ev.allDay ? 'All day' : still ? 'to ' + fmtTime.format(new Date(+ev.endMs)) : ev.time;
+    row.appendChild(el('div', 'ev-time', time));
     row.appendChild(el('div', 'ev-title', ev.title));
     if (ev.location) row.appendChild(el('div', 'ev-loc', ev.location));
     if (!ev.allDay) { row.dataset.start = ev.startMs; row.dataset.end = ev.endMs; }
     return row;
+  }
+  /* Today follows the clock: finished events drop off, the newest event to start
+     goes first, then what's next. Longer events still running from earlier go last. */
+  function rollToday(events, now) {
+    var allDay = [], live = [], next = [], newest = 0;
+    events.forEach(function (ev) {
+      if (ev.allDay) allDay.push({ ev: ev });
+      else if (+ev.endMs <= now) return;
+      else if (+ev.startMs <= now) { live.push(ev); newest = Math.max(newest, +ev.startMs); }
+      else next.push({ ev: ev });
+    });
+    var fresh = [], still = [];
+    live.forEach(function (ev) {
+      if (+ev.startMs === newest) fresh.push({ ev: ev });
+      else still.push({ ev: ev, still: true });
+    });
+    return allDay.concat(fresh, next, still);
+  }
+  function renderToday(day) {
+    var list = $('l0');
+    if (!day || !day.events.length) { renderDay('l0', 'd0', day); return; }
+    list.innerHTML = '';
+    setText('d0', day.weekday.slice(0, 3) + ' · ' + day.date);
+    var rows = rollToday(day.events, Date.now());
+    if (!rows.length) { list.appendChild(el('div', 'empty', 'All done for today')); return; }
+    rows.forEach(function (r) { list.appendChild(eventRow(r.ev, r.still)); });
   }
   function renderDay(listId, dateId, day) {
     var list = $(listId);
@@ -371,13 +397,12 @@
     }
   }
 
-  /* Dim finished events, highlight the one happening now. */
+  /* Highlight what's happening now. */
   function markLive() {
     var now = Date.now();
     var rows = $('l0').querySelectorAll('.ev[data-start]');
     for (var i = 0; i < rows.length; i++) {
       var s = +rows[i].dataset.start, e = +rows[i].dataset.end;
-      rows[i].classList.toggle('past', e <= now);
       rows[i].classList.toggle('live', s <= now && e > now);
     }
   }
@@ -385,7 +410,7 @@
   function renderCalendar() {
     var d = state.data;
     if (!d || !d.days) return;
-    renderDay('l0', 'd0', d.days[0]);
+    renderToday(d.days[0]);
     renderDay('l1', 'd1', d.days[1]);
     renderLater(d.days);
     markLive();
@@ -477,7 +502,7 @@
 
   tickClock();
   setInterval(tickClock, 15000);
-  setInterval(markLive, 60000);
+  setInterval(renderCalendar, 60000);   // Today moves with the clock
   setInterval(loadCalendar, CAL_REFRESH_MS);
   setInterval(loadWeather, WX_REFRESH_MS);
   window.addEventListener('resize', render);
