@@ -109,6 +109,16 @@
   .later .ev-title { font-size: 1.3vw; -webkit-line-clamp: 1; }
   .later .ev-loc { display: none; }
 
+  /* photo tile */
+  .col.photos { padding: 0; overflow: hidden; position: relative; background: #0a0d12; }
+  .ph { position: absolute; inset: 0; opacity: 0; transition: opacity 1.6s ease; }
+  .ph.on { opacity: 1; }
+  .ph .blur { position: absolute; inset: -6%; background-size: cover; background-position: center;
+              filter: blur(28px) brightness(.55); }
+  .ph img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .ph-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+              text-align: center; padding: 3vw; font-size: 1.3vw; line-height: 1.4; color: var(--faint); }
+
   .empty { font-size: 1.35vw; color: var(--faint); font-weight: 500; }
   .more { font-size: 1.1vw; color: var(--muted); font-weight: 600; }
 
@@ -151,14 +161,11 @@
       <div class="col-head"><div class="col-title">Today</div><div class="col-date" id="d0"></div></div>
       <div class="list" id="l0"></div>
     </section>
-    <section class="col">
-      <div class="col-head"><div class="col-title">Tomorrow</div><div class="col-date" id="d1"></div></div>
-      <div class="list" id="l1"></div>
-    </section>
     <section class="col later">
       <div class="col-head"><div class="col-title">Coming up</div><div class="col-date">Family</div></div>
       <div class="list" id="l2"></div>
     </section>
+    <section class="col photos" id="photos"></section>
   </main>
 
   <footer class="forecast" id="forecast"></footer>
@@ -364,10 +371,10 @@
     var list = $('l2');
     list.innerHTML = '';
     var any = false;
-    days.slice(2).forEach(function (day) {
+    days.slice(1).forEach(function (day, i) {
       if (!day.events.length) return;
       any = true;
-      list.appendChild(el('div', 'dayhead', day.weekday + ' · ' + day.date));
+      list.appendChild(el('div', 'dayhead', (i === 0 ? 'Tomorrow' : day.weekday) + ' · ' + day.date));
       day.events.forEach(function (ev) { list.appendChild(eventRow(ev)); });
     });
     if (!any) list.appendChild(el('div', 'empty', 'Quiet days ahead'));
@@ -411,10 +418,9 @@
     var d = state.data;
     if (!d || !d.days) return;
     renderToday(d.days[0]);
-    renderDay('l1', 'd1', d.days[1]);
     renderLater(d.days);
     markLive();
-    ['l0', 'l1', 'l2'].forEach(function (id) { fit($(id)); });
+    ['l0', 'l2'].forEach(function (id) { fit($(id)); });
   }
   function renderStatus() {
     var st = $('status');
@@ -500,6 +506,66 @@
       .catch(weatherFallback);
   }
 
+  /* ---------- photos (Drive folder, listed by the Apps Script) ---------- */
+  var PHOTO_MS = 15 * 1000, PHOTO_LIST_MS = 30 * 60 * 1000;
+  var photos = { ids: [], order: [], pos: 0, cur: null, timer: null };
+  function photoUrl(id) {
+    var w = Math.round($('photos').clientWidth * (window.devicePixelRatio || 1) * 1.2) || 1200;
+    return 'https://lh3.googleusercontent.com/d/' + id + '=w' + Math.min(w, 2000);
+  }
+  function shuffle(a) {
+    a = a.slice();
+    for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+  function photoEmpty(msg) {
+    var box = $('photos'); box.innerHTML = ''; photos.cur = null;
+    box.appendChild(el('div', 'ph-empty', msg));
+  }
+  function nextPhoto(tries) {
+    if (!photos.ids.length) return;
+    if (photos.pos >= photos.order.length) {
+      photos.order = shuffle(photos.ids); photos.pos = 0;
+      if (photos.order.length > 1 && photos.order[0] === photos.last) photos.order.push(photos.order.shift());
+    }
+    var id = photos.order[photos.pos++], url = photoUrl(id);
+    photos.last = id;
+    var img = new Image();
+    img.onload = function () {
+      var box = $('photos');
+      var ph = el('div', 'ph');
+      var bg = el('div', 'blur'); bg.style.backgroundImage = 'url("' + url + '")';
+      ph.appendChild(bg); ph.appendChild(img);
+      var empty = box.querySelector('.ph-empty'); if (empty) box.removeChild(empty);
+      box.appendChild(ph);
+      void ph.offsetWidth; ph.classList.add('on');
+      var old = photos.cur; photos.cur = ph;
+      if (old) setTimeout(function () { if (old.parentNode) old.parentNode.removeChild(old); }, 2000);
+    };
+    img.onerror = function () {          // skip a photo that won't load (e.g. a video or unshared file)
+      if ((tries || 0) < Math.min(5, photos.ids.length)) nextPhoto((tries || 0) + 1);
+    };
+    img.src = url;
+  }
+  function onPhotos(d) {
+    var ids = (d && d.photos) || [];
+    if (!ids.length) {
+      photos.ids = [];
+      photoEmpty(d && d.error ? 'Photos: ' + d.error : 'Add pictures to the “Family TV Photos” folder in Google Drive');
+      return;
+    }
+    var changed = ids.join() !== photos.ids.join();
+    photos.ids = ids;
+    if (changed) { photos.order = shuffle(ids); photos.pos = 0; }
+    if (!photos.timer) { nextPhoto(); photos.timer = setInterval(nextPhoto, PHOTO_MS); }
+  }
+  function loadPhotos() {
+    if (window.__DEMO_PHOTOS__) { onPhotos(window.__DEMO_PHOTOS__); return; }
+    if (!API) return;
+    fetch(apiUrl('&photos=1')).then(function (res) { return res.json(); }).then(onPhotos)
+      .catch(function (e) { if (!photos.ids.length) photoEmpty('Couldn’t load photos · retrying'); if (window.console) console.warn(e); });
+  }
+
   tickClock();
   setInterval(tickClock, 15000);
   setInterval(renderCalendar, 60000);   // Today moves with the clock
@@ -510,6 +576,8 @@
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { renderCalendar(); });
   loadCalendar();
   loadWeather();
+  loadPhotos();
+  setInterval(loadPhotos, PHOTO_LIST_MS);
 })();
 </script>
 </body>
