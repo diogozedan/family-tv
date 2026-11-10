@@ -100,13 +100,21 @@
   }
 
   /* compact "coming up" list */
-  .later .list { gap: .9vh; }
-  .dayhead { font-size: 1.05vw; font-weight: 700; color: var(--muted); text-transform: uppercase;
-             letter-spacing: .09em; margin-top: 1vh; }
+  .later .list { gap: 1.3vh; }
+  .dayhead { font-size: 1.2vw; font-weight: 700; color: var(--muted); text-transform: uppercase;
+             letter-spacing: .09em; margin-top: 1.6vh; }
   .dayhead:first-child { margin-top: 0; }
-  .later .ev { grid-template-columns: 5.6vw 1fr; }
-  .later .ev-time { font-size: 1.05vw; }
-  .later .ev-title { font-size: 1.3vw; -webkit-line-clamp: 1; }
+  .later .ev { grid-template-columns: 6.4vw 1fr; }
+  .later .ev-time { font-size: 1.2vw; }
+  .later .ev-title { font-size: 1.5vw; -webkit-line-clamp: 1; }
+
+  /* Who the appointment is for: a soft box around the person's name. */
+  .who { padding: .02em .32em; border-radius: .35em; border: 1px solid; box-decoration-break: clone;
+         -webkit-box-decoration-break: clone; }
+  .who.ique  { background: rgba(110, 200, 140, .14); border-color: rgba(110, 200, 140, .45); }
+  .who.tata  { background: rgba(240, 140, 190, .14); border-color: rgba(240, 140, 190, .45); }
+  .who.bell  { background: rgba(240, 205, 100, .14); border-color: rgba(240, 205, 100, .45); }
+  .who.diogo { background: rgba(110, 165, 250, .14); border-color: rgba(110, 165, 250, .45); }
   .later .ev-loc { display: none; }
 
   /* photo tile */
@@ -186,6 +194,11 @@
   var TZ = 'America/Toronto';
   var PLACE = 'Pelham', LAT = 43.04, LON = -79.28;   // keep in sync with CONFIG in Code.gs
   var CAL_REFRESH_MS = 5 * 60 * 1000;
+  // Coloured box around family names in event titles. Set to false to turn off.
+  var PERSON_TAGS = params.get('tags') !== '0';
+  var PEOPLE = [   // [class, pattern]  (pattern is matched as a whole word, any case)
+    ['ique', 'Ique'], ['tata', 'Tat[aá]'], ['bell', 'Bell'], ['diogo', 'Diogo']
+  ];
   var WX_REFRESH_MS = 15 * 60 * 1000;
 
   var state = { data: null, weather: null, calErr: false, wxErr: false };
@@ -324,11 +337,31 @@
   }
 
   /* ---------- render: calendar ---------- */
+  var WHO_RE = new RegExp('(^|[^A-Za-z\u00C0-\u00FF])(' + PEOPLE.map(function (p) { return p[1]; }).join('|') +
+                          ')(?![A-Za-z\u00C0-\u00FF])', 'gi');
+  function whoClass(name) {
+    for (var i = 0; i < PEOPLE.length; i++) if (new RegExp('^' + PEOPLE[i][1] + '$', 'i').test(name)) return PEOPLE[i][0];
+    return '';
+  }
+  function titleEl(text) {
+    var t = el('div', 'ev-title');
+    if (!PERSON_TAGS) { t.textContent = text; return t; }
+    var last = 0, m;
+    WHO_RE.lastIndex = 0;
+    while ((m = WHO_RE.exec(text))) {
+      var start = m.index + m[1].length;
+      if (start > last) t.appendChild(document.createTextNode(text.slice(last, start)));
+      t.appendChild(el('span', 'who ' + whoClass(m[2]), m[2]));
+      last = start + m[2].length;
+    }
+    if (last < text.length) t.appendChild(document.createTextNode(text.slice(last)));
+    return t;
+  }
   function eventRow(ev, still) {
     var row = el('div', 'ev' + (ev.allDay ? ' allday' : '') + (still ? ' still' : ''));
     var time = ev.allDay ? 'All day' : still ? 'to ' + fmtTime.format(new Date(+ev.endMs)) : ev.time;
     row.appendChild(el('div', 'ev-time', time));
-    row.appendChild(el('div', 'ev-title', ev.title));
+    row.appendChild(titleEl(ev.title));
     if (ev.location) row.appendChild(el('div', 'ev-loc', ev.location));
     if (!ev.allDay) { row.dataset.start = ev.startMs; row.dataset.end = ev.endMs; }
     return row;
