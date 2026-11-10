@@ -109,14 +109,12 @@
   .later .ev-title { font-size: 1.5vw; -webkit-line-clamp: 1; }
 
   /* Who the appointment is for: a soft coloured box around the whole event title. */
-  .ev-title { justify-self: start; max-width: 100%; padding: .1em .45em; border-radius: .4em;
-              border: 1px solid transparent; }   /* same spacing with or without a colour box */
-  .ev-title.who { border-color: rgba(255,255,255,.16); }
+  .ev { padding: .55vh .6vw; border-radius: .5vw; border: 1px solid transparent; }   /* every row keeps the same spacing */
+  .ev.who { border-color: rgba(255,255,255,.16); }
   .who.ique  { background: rgba(110, 200, 140, .14); border-color: rgba(110, 200, 140, .45); }
   .who.tata  { background: rgba(240, 140, 190, .14); border-color: rgba(240, 140, 190, .45); }
   .who.bell  { background: rgba(240, 205, 100, .14); border-color: rgba(240, 205, 100, .45); }
   .who.diogo { background: rgba(110, 165, 250, .14); border-color: rgba(110, 165, 250, .45); }
-  .ev.live .ev-title.who::after { margin-right: -.1em; }
   .later .ev-loc { display: none; }
 
   /* photo tile */
@@ -346,30 +344,34 @@
     return '';
   }
   var TINT = { ique: '110, 200, 140', tata: '240, 140, 190', bell: '240, 205, 100', diogo: '110, 165, 250' };
-  function titleEl(text) {
-    var t = el('div', 'ev-title', text);
-    if (!PERSON_TAGS) return t;
+  function peopleIn(text) {
     var who = [], m;
+    if (!PERSON_TAGS) return who;
     WHO_RE.lastIndex = 0;
     while ((m = WHO_RE.exec(text))) {
       var c = whoClass(m[2]);
       if (c && who.indexOf(c) < 0) who.push(c);
     }
-    if (!who.length) return t;
-    t.className += ' who ' + who[0];
-    if (who.length > 1) {   // shared event: blend the people's colours left to right
-      t.style.backgroundImage = 'linear-gradient(90deg, ' + who.map(function (c, i) {
+    return who;
+  }
+  /* Colour the whole event row by who it's for; shared events blend the colours left to right. */
+  function tagRow(row, text) {
+    var who = peopleIn(text);
+    if (!who.length) return;
+    row.className += ' who ' + who[0];
+    if (who.length > 1) {
+      row.style.backgroundImage = 'linear-gradient(90deg, ' + who.map(function (c, i) {
         return 'rgba(' + TINT[c] + ', .16) ' + Math.round(i * 100 / (who.length - 1)) + '%';
       }).join(', ') + ')';
-      t.style.borderColor = 'rgba(255,255,255,.2)';
+      row.style.borderColor = 'rgba(255,255,255,.2)';
     }
-    return t;
   }
   function eventRow(ev, still) {
     var row = el('div', 'ev' + (ev.allDay ? ' allday' : '') + (still ? ' still' : ''));
     var time = ev.allDay ? 'All day' : still ? 'to ' + fmtTime.format(new Date(+ev.endMs)) : ev.time;
     row.appendChild(el('div', 'ev-time', time));
-    row.appendChild(titleEl(ev.title));
+    row.appendChild(el('div', 'ev-title', ev.title));
+    tagRow(row, ev.title);
     if (ev.location) row.appendChild(el('div', 'ev-loc', ev.location));
     if (!ev.allDay) { row.dataset.start = ev.startMs; row.dataset.end = ev.endMs; }
     return row;
